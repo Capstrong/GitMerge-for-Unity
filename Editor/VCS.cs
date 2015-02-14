@@ -18,6 +18,9 @@ namespace GitMerge
         public abstract void GetTheirs(string path);
         public abstract void MarkAsMerged(string path);
 
+        //This one's for experimental three-way merging
+        public abstract void GetBase(string path);
+
         public string exe()
         {
             if(EditorPrefs.HasKey(EditorPrefsKey()))
@@ -47,6 +50,7 @@ namespace GitMerge
             startInfo.Arguments = args;
             startInfo.UseShellExecute = false;
             startInfo.RedirectStandardOutput = true;
+            startInfo.CreateNoWindow = true;
             process.StartInfo = startInfo;
 
             try

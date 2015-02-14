@@ -83,11 +83,30 @@ namespace GitMerge
 
         /// <summary>
         /// Finds the differences between properties of the two GameObjects.
-        /// That means the name, layer, tag... everything that's not part of a Component.
+        /// That means the name, layer, tag... everything that's not part of a Component. Also, the parent.
         /// </summary>
         private void FindPropertyDifferences()
         {
+            CheckForDifferentParents();
             FindPropertyDifferences(ours, theirs);
+        }
+
+        /// <summary>
+        /// Since parenting is quite special, here's some dedicated handling.
+        /// </summary>
+        private void CheckForDifferentParents()
+        {
+            var transform = ours.GetComponent<Transform>();
+            var ourParent = transform.parent;
+            var theirParent = theirs.GetComponent<Transform>().parent;
+            if(theirParent != null)
+            {
+                theirParent = ObjectDictionaries.GetOurObject(ObjectIDFinder.GetIdentifierFor(theirParent)) as Transform;
+            }
+            if(ourParent != theirParent)
+            {
+                actions.Add(new MergeActionParenting(transform, ourParent, theirParent));
+            }
         }
 
         /// <summary>
@@ -260,6 +279,19 @@ namespace GitMerge
             {
                 action.UseOurs();
             }
+            merged = true;
+        }
+
+        /// <summary>
+        /// Use "their" version for all conflicts.
+        /// </summary>
+        public void UseTheirs()
+        {
+            foreach(var action in actions)
+            {
+                action.UseTheirs();
+            }
+            merged = true;
         }
 
         //If the foldout is open
@@ -299,6 +331,20 @@ namespace GitMerge
                         CheckIfMerged();
                     }
                 }
+            }
+            else
+            {
+                GUILayout.BeginHorizontal();
+                if(GUILayout.Button("Use ours >>>", EditorStyles.miniButton))
+                {
+                    UseOurs();
+                }
+
+                if(GUILayout.Button("<<< Use theirs", EditorStyles.miniButton))
+                {
+                    UseTheirs();
+                }
+                GUILayout.EndHorizontal();
             }
 
             //If "ours" is null, the GameObject doesn't exist in one of the versions.
