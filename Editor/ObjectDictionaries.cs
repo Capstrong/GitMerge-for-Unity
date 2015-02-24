@@ -23,6 +23,11 @@ namespace GitMerge
         //<GameObject, originallyActive>
         private static Dictionary<GameObject, bool> theirObjects = new Dictionary<GameObject, bool>();
 
+        //This dict holds all GameObjects that might or might not exist,
+        //depending on the current merge state. The referenced objects are the versions that will definitely exist throughout the merge.
+        //Also maps the MergeActions responsible for their existence to them.
+        private static Dictionary<GameObject, MergeActionExistence> schroedingersObjects = new Dictionary<GameObject, MergeActionExistence>();
+
 
         public static void SetAsOurObjects(List<GameObject> objects)
         {
@@ -57,6 +62,9 @@ namespace GitMerge
 
         private static void AddOurObject(Object o)
         {
+            if(o == null)
+                return;
+
             ourObjects.Add(ObjectIDFinder.GetIdentifierFor(o), o);
         }
 
@@ -76,6 +84,9 @@ namespace GitMerge
 
         private static void RemoveOurSingleObject(Object o)
         {
+            if(o == null)
+                return;
+
             ourObjects.Remove(ObjectIDFinder.GetIdentifierFor(o));
         }
 
@@ -89,8 +100,9 @@ namespace GitMerge
         /// <summary>
         /// Returns:
         /// * the given object if it is "ours"
-        /// * "our" counterprt of obj if it is "theirs"
+        /// * "our" counterpart of obj if it is "theirs"
         /// * null if the object is deleted for some reason
+        /// The returned object can be an instance of "their" object temporarily added for the merge
         /// </summary>
         /// <param name="obj">the original object</param>
         /// <returns>the counterpart of the object in "our" version</returns>
@@ -100,6 +112,10 @@ namespace GitMerge
             if(IsTheirs(obj))
             {
                 result = GetOurObject(ObjectIDFinder.GetIdentifierFor(obj));
+                if(!result)
+                {
+                    result = GetOurInstanceOfCopy(obj);
+                }
             }
             return result;
         }
@@ -109,6 +125,7 @@ namespace GitMerge
             ourObjects.Clear();
             theirObjects.Clear();
             ourInstances.Clear();
+            schroedingersObjects.Clear();
         }
 
         /// <summary>
@@ -127,6 +144,9 @@ namespace GitMerge
 
         public static void SetAsCopy(Component c, Component theirs)
         {
+            if(c == null)
+                return;
+
             ourInstances.Add(theirs, c);
         }
 
@@ -135,7 +155,10 @@ namespace GitMerge
             ourInstances.Remove(theirs);
             foreach(var c in theirs.GetComponents<Component>())
             {
-                ourInstances.Remove(c);
+                if(c != null)
+                {
+                    ourInstances.Remove(c);
+                }
             }
         }
 
@@ -196,6 +219,12 @@ namespace GitMerge
         {
             var copy = GameObject.Instantiate(go) as GameObject;
 
+            //Destroy children
+            foreach(Transform t in copy.GetComponent<Transform>())
+            {
+                Object.DestroyImmediate(t.gameObject);
+            }
+
             bool wasActive;
             if(!theirObjects.TryGetValue(go, out wasActive))
             {
@@ -218,6 +247,16 @@ namespace GitMerge
                 Object.DestroyImmediate(obj);
             }
             theirObjects.Clear();
+        }
+
+        public static void AddToSchroedingersObjects(GameObject go, MergeActionExistence mergeAction)
+        {
+            schroedingersObjects.Add(go, mergeAction);
+        }
+
+        public static void EnsureExistence(GameObject go)
+        {
+            schroedingersObjects[go].EnsureExistence();
         }
     }
 }
